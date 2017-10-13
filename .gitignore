@@ -19,6 +19,9 @@ cfg/
 darknet
 .fuse*
 weights/
+*.a
+*.so
+__pycache__
 
 # OS Generated #
 .DS_Store*
