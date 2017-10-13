@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+# Todo: display labels and confidence level
+
 def pipeline(frame):
     return frame
 
