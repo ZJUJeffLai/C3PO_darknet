@@ -11,7 +11,6 @@ def pipeline(frame):
     return frame
 
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
-    print( "draw boxes" ) 
     # Make a copy of the image
     imcopy = np.copy(img)
 
@@ -25,9 +24,9 @@ def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
 
 if __name__ == "__main__":
     # os.chdir("/home/sirius/Desktop/darknet/")
-    net = load_net(b"cfg/yolo.cfg", b"weights/yolo.weights", 0)
-    meta = load_meta(b"cfg/coco.data")
-    r = detect(net, meta, b"data/dog.jpg")
+    net = load_net(b"darknet/cfg/yolo.cfg", b"weights/yolo.weights", 0)
+    meta = load_meta(b"darknet/cfg/coco.data")
+    r = detect(net, meta, b"darknet/data/dog.jpg")
 
     print (r[0][0]) # label
     print (r[0][1]) # confidence
@@ -38,15 +37,15 @@ if __name__ == "__main__":
     print (r[1][1]) # confidence
     print (r[1][2]) # box coordinates
     #im = cv2.imread("data/dog.jpg")
-    im = mpimg.imread("data/dog.jpg")
+    im = mpimg.imread("darknet/data/dog.jpg")
     for detection in r:
         im = draw_boxes(im, detection[2])
     
     plt.imshow(im)
     plt.show()
 
-    r = detect(net, meta, b"data/scream.jpg")
+    r = detect(net, meta, b"darknet/data/scream.jpg")
     print (r)
 
-    r = detect(net, meta, b"data/eagle.jpg")
+    r = detect(net, meta, b"darknet/data/eagle.jpg")
     print (r)
