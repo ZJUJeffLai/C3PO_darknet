@@ -5,6 +5,7 @@
 *.png
 *.jpg
 *.pyc
+*.mp4
 old/
 mnist/
 data/

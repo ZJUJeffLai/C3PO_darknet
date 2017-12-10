@@ -46,22 +46,29 @@ def detect_crossing_with_history(current_frame, last_frame):
             while(cloest_neighbor.label != ob.label and len(heap) > 0):
                 cloest_neighbor = heappop(heap)[1]
 
-            current_frame.objects[i].trajectory = cloest_neighbor.trajectory
             if cloest_neighbor.label == ob.label:
+                current_frame.objects[i].traj_color = cloest_neighbor.traj_color
+                current_frame.objects[i].counted = cloest_neighbor.counted
+                current_frame.objects[i].trajectory = cloest_neighbor.trajectory
                 current_frame.objects[i].trajectory.append(cloest_neighbor.origin)
                 obs.remove(cloest_neighbor)
-            else:
-                current_frame.objects[i].trajectory.append(ob.origin) # no matching object from last frame, append itself
-        else:
+            #else:
+            #    current_frame.objects[i].trajectory.append(ob.origin) # no matching object from last frame, append itself
+            #    already handled by the Object constructor
+        #else:
             # if the current frame has more objects than last frame, 
             # all the extra objects will append their own origins to the their own trajectories
-            current_frame.objects[i].trajectory.append(ob.origin)           
+            # current_frame.objects[i].trajectory.append(ob.origin)
+            # do nothing, Object constructor already handle this. A new object will append its own origin into its trajectory       
 
     if len(obs) > 0: # last frame has more objects
         print("left over happens, current_frame # objs:", len(current_frame.objects))
         for ob in obs:
-            ob.trajectory.append(ob.origin) # append its own origin to the trajectory
-            current_frame.objects.append(ob)
+            if len(ob.trajectory) > 0 :
+                ob.trajectory.popleft() # drop its oldest point
+                current_frame.objects.append(ob)
+            #else:
+                # let it handle by garbage collector
 
     print("*********************current_frame # objs:", len(current_frame.objects))
     for i,ob in enumerate(current_frame.objects):
@@ -69,7 +76,7 @@ def detect_crossing_with_history(current_frame, last_frame):
         print(i)
         print(ob.trajectory)
         print()
-        if (len(ob.trajectory) - len(set(ob.trajectory)) > 6 ): # 6 repeating points
+        if (~ob.counted and len(ob.trajectory) > 5):
             # considered moving out of frame
             if ob.label == "person":
                 p +=1
@@ -77,7 +84,7 @@ def detect_crossing_with_history(current_frame, last_frame):
                 c += 1
             elif ob.label == "bike" or ob.label == "motorcycle" or ob.label == "bicycle":
                 b += 1
-            current_frame.objects.pop(i) # destroy itself
+            ob.counted = True
 
     print("p:", p, "c:", c, "b:", b)
 
