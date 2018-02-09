@@ -24,11 +24,16 @@ class Object:
         h = detection_output[2][3]
         return (int(x), int(y)), (int(x - w/2),int(y - h/2)), (int(x + w/2),int(y + h/2))
 
-    def trajectory_tracking(self, point):
-        self.trajectory.append(point)
+    def process_measurement(origin):
+        self.Kalman_filter.ProcessMeasurement(np.array(origin)) # px, py
+        self.trajectory.append(self.Kalman_filter.CurrentEstPos())
+        assert len(trajectory == len(measurements))
 
     def __lt__(self, other):
         if isinstance(other, Object):
             return 1 # don't care which one is larger
 
         return NotImplemented
+
+    #def __del__(self):
+        #print (self.label + " died")
