@@ -29,7 +29,7 @@ class Kalman_filter:
         self.R_ = np.array([[0.02, 0],
                             [0, 0.02]])
 
-        # this time depends on the machine's processing time, which is not the actual time elapsed in the real world
+        # this time depends on the frame update rate, which is not the actual time elapsed in the real world
         self.t_ = frame_seq
 
     def Predict(self):
