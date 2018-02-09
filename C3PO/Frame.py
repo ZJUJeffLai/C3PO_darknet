@@ -103,7 +103,12 @@ class Frame:
     def draw_trajectory(self):
         for ob in self.objects:
             for pt in ob.trajectory:
-                self.box_img = cv2.circle(self.box_img, (pt[0], pt[1]), 3, ob.traj_color, -1)
+                self.box_img = cv2.circle(self.box_img, (int(pt[0]), int(pt[1])), 3, ob.traj_color, -1)
+
+    def plot_measurements(self):
+        for ob in self.objects:
+            for pt in ob.measurements:
+                self.box_img = cv2.circle(self.box_img, (pt[0], pt[1]), 3, (0,255,0), -1)
 
 
     def draw_grid(self):
@@ -148,29 +153,29 @@ class Frame:
         self.box_img = cv2.addWeighted(self.box_img, 1, mask, 0.3, 0)
         self.NROI_MASK = mask[:,:,0]
 
-
-
     def detect_crossing(self, ct):
 
         display_text =  ct.stats()
-        cv2.putText(self.box_img, display_text, (40,15), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,255),2)
+        cv2.putText(self.box_img, display_text, (40,18), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,255),2)
 
-        for ob in self.objects:
-            if ob.origin[1] < 380:
-                continue
+        # for ob in self.objects:
+        #     if ob.origin[1] < 380:
+        #         continue
 
-            if ob.origin[1] > 420:
-                continue
+        #     if ob.origin[1] > 420:
+        #         continue
 
-            if ob.label == "person":
-                ct.add_pedestrian()
-            elif ob.label == "truck":
-                ct.add_vehicle()
-            elif ob.label == "car":
-                ct.add_vehicle()
-            elif ob.label == "bicycle":
-                ct.add_bike()
-            elif ob.label == "motorcycle":
-                ct.add_bike()
-            elif ob.label == "bike":
-                ct.add_bike()
+            # if ob.label == "person":
+            #     ct.add_pedestrian()
+            # elif ob.label == "truck":
+            #     ct.add_vehicle()
+            # elif ob.label == "car":
+            #     ct.add_vehicle()
+            # elif ob.label == "bicycle":
+            #     ct.add_bike()
+            # elif ob.label == "motorcycle":
+            #     ct.add_bike()
+            # elif ob.label == "bike":
+            #     ct.add_bike()
+    #def __del__(self):
+        #print ("Frame " + " died")

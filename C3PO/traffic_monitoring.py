@@ -2,6 +2,7 @@ from darknet import load_net, load_meta, detect
 from Counter import Counter
 from Object import Object
 from Frame import Frame, draw_box
+from Kalman_filter import FRAME_SQE_MAX
 import cv2 # don't compile darknet with opencv, conflicts will cause seg fault
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
@@ -30,6 +31,8 @@ g_polygon_num = 0
 GRID_MATRIX_INIT = 0
 grid_matrix = []
 grid_step = 100
+frame_seq = 0
+#FRAME_SQE_MAX = 1000
 
 p = 0
 c = 0
@@ -151,8 +154,11 @@ def detect_crossing_with_history(current_frame, last_frame):
             if cloest_neighbor.label == ob.label and square_distance(ob.origin, cloest_neighbor.origin) < 100:
                 current_frame.objects[i].traj_color = cloest_neighbor.traj_color
                 current_frame.objects[i].counted = cloest_neighbor.counted
+                current_frame.objects[i].measurements = cloest_neighbor.measurements
                 current_frame.objects[i].trajectory = cloest_neighbor.trajectory
-                current_frame.objects[i].trajectory.append(cloest_neighbor.origin)
+                current_frame.objects[i].Kalman_filter = cloest_neighbor.Kalman_filter
+                current_frame.objects[i].measurements.append(cloest_neighbor.origin)
+                current_frame.objects[i].process_measurement(cloest_neighbor.origin, current_frame.frame_seq)
                 #print(square_distance(ob.origin, cloest_neighbor.origin))
                 cv2.line(current_frame.box_img,cloest_neighbor.origin,ob.origin,ob.traj_color, 5);
                 before = len(obs)
@@ -186,7 +192,7 @@ def detect_crossing_with_history(current_frame, last_frame):
         #print(i)
         #print(ob.trajectory)
         #print()
-        if (not ob.counted and len(ob.trajectory) > 5):
+        if (not ob.counted and count_within_ROI(ob.trajectory) > 5):
             # considered moving out of frame
             if ob.label == "person":
                 ct.add_pedestrian()
@@ -201,6 +207,13 @@ def detect_crossing_with_history(current_frame, last_frame):
     assert len(obs) == 0
     #print ("Last frame objects: " + str(len(last_frame.objects))+ "obs objects: "+ str(len(obs)) +"This frame objects: " + str(len(current_frame.objects)))
 
+def count_within_ROI(traj):
+    count = 0;
+    for pt in traj:
+        if ROI_MASK[int(pt[1])][int(pt[0])] == 255:
+            # HIT ROI
+            count += 1
+    return count
 
 def square_distance(p1, p2):
     return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**0.5
@@ -258,6 +271,7 @@ def pipeline(frame):
 
     #print(len(fm.objects))
 
+    fm.plot_measurements()
     fm.draw_trajectory()
 
     history.append(fm)
