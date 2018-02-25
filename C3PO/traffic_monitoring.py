@@ -12,22 +12,35 @@ from collections import deque
 import heapq as heapq
 from heapq import *
 import pickle
+import pytesseract
 
 from moviepy.editor import VideoFileClip
 #from IPython.display import HTML
 
+# ToDo: Maybe combine the ROI get corners method and Timestamp area get corners method
 
 ct = Counter()
 history = deque(maxlen = 1)
 screen = [] # keep track of unique objects within the screen
 
+# Timestamp area variables
+DEFINE_NEW_TIMESTAMP_AREA = 0
+NUM_OF_TIMESTAMP_AREA_CORNERS = 4
+TIMESTAMP_AREA_CORNER_VALID = 0
+g_corners_timestamp = []
+g_polygon_num_timestamp = 0
+
+# ROI variables
 DEFINE_NEW_ROI = 0
 NUM_OF_CORNERS = 5
 CORNER_VALID = 0
-MASK_VALID = 0
-ROI_MASK = []
 g_corners = []
 g_polygon_num = 0
+
+
+MASK_VALID = 0
+ROI_MASK = []
+
 GRID_MATRIX_INIT = 0
 grid_matrix = []
 grid_step = 100
@@ -53,6 +66,18 @@ def load_user_defined_corners():
 
 '''
 Brief
+    This function will load cached timestamp area coordiantes
+Input
+    None
+Return
+    user_defined_corners corners
+'''
+def load_timestamp_corners():
+    timestamp_corners = pickle.load(open("cache/timestamp_corners.p", "rb" ))
+    return timestamp_corners["corners"]
+
+'''
+Brief
     This function will handle user clicks on a opened cv2 image
 Input
     event: event handler
@@ -63,13 +88,33 @@ Input
 Return
     None
 '''
-def clicks(event, x, y, flags, param):
+def clicks_ROI(event, x, y, flags, param):
     global g_corners, g_polygon_num
     if event == cv2.EVENT_LBUTTONDOWN:
         if g_polygon_num < NUM_OF_CORNERS:
             print([x,y])
             g_corners.append([x,y])
         g_polygon_num = g_polygon_num + 1
+
+'''
+Brief
+    This function will handle user clicks on a opened cv2 image
+Input
+    event: event handler
+    x: x coordinate
+    y: y coordinate
+    flags: flags (not in use)
+    param: param (not in use)
+Return
+    None
+'''
+def clicks_timestamp(event, x, y, flags, param):
+    global g_corners_timestamp, g_polygon_num_timestamp
+    if event == cv2.EVENT_LBUTTONDOWN:
+        if g_polygon_num_timestamp < NUM_OF_TIMESTAMP_AREA_CORNERS:
+            print([x,y])
+            g_corners_timestamp.append([x,y])
+        g_polygon_num_timestamp = g_polygon_num_timestamp + 1
 
 '''
 Brief
@@ -90,7 +135,7 @@ def get_corners(img):
     # clone the image, and setup the mouse callback function
     clone = img.copy()
     cv2.namedWindow("img")
-    cv2.setMouseCallback("img", clicks)
+    cv2.setMouseCallback("img", clicks_ROI)
 
     # keep looping until the 'c' key  is pressed or more than 4 corners are defined
     while True:
@@ -101,7 +146,7 @@ def get_corners(img):
                 cv2.line(clone,(g_corners[i][0],g_corners[i][1]),(g_corners[i+1][0],g_corners[i+1][1]),(0,0,255),15)
         # fill the last line at fifth click
         if g_polygon_num >= NUM_OF_CORNERS + 1:
-            cv2.line(clone,(g_corners[NUM_OF_CORNERS-1][0],g_corners[NUM_OF_CORNERS-1][1]),(g_corners[0][0],g_corners[0][1]),(0,0,255),5)
+            cv2.line(clone,(g_corners[NUM_OF_CORNERS-1][0],g_corners[NUM_OF_CORNERS-1][1]),(g_corners[0][0],g_corners[0][1]),(0,0,255),15)
 
         cv2.imshow("img", clone)
         key = cv2.waitKey(1) & 0xFF
@@ -121,6 +166,62 @@ def get_corners(img):
     print("User defined corners: ", g_corners)
 
     return g_corners
+
+'''
+Brief
+    This function will let user to specify 4 corners to define a polygon area.
+It's assumed that user will follow the order of top left, bottom left, bottom
+right, and top right (counter-clockwise fashion).
+Input
+    img: input image
+Return
+    The user defined corners
+'''
+def get_timestamp_corners(img):
+    global g_corners_timestamp, g_polygon_num_timestamp
+    # init
+    g_corners_timestamp = []
+    g_polygon_num_timestamp = 0
+
+    # clone the image, and setup the mouse callback function
+    clone = img.copy()
+    cv2.namedWindow("img")
+    cv2.setMouseCallback("img", clicks_timestamp)
+
+    # keep looping until the 'c' key  is pressed or more than 4 corners are defined
+    while True:
+        # display the image and wait for a keypress
+        if g_polygon_num_timestamp < NUM_OF_TIMESTAMP_AREA_CORNERS + 1:
+            for i in range(0,g_polygon_num_timestamp - 1):
+                # Draw a red line with thickness of 5 px
+                cv2.line(clone,(g_corners_timestamp[i][0],g_corners_timestamp[i][1]),(g_corners_timestamp[i+1][0],g_corners_timestamp[i+1][1]),(0,0,255),15)
+        # fill the last line at fifth click
+        if g_polygon_num_timestamp >= NUM_OF_TIMESTAMP_AREA_CORNERS + 1:
+            cv2.line(clone,(g_corners_timestamp[NUM_OF_TIMESTAMP_AREA_CORNERS-1][0],g_corners_timestamp[NUM_OF_TIMESTAMP_AREA_CORNERS-1][1]),(g_corners_timestamp[0][0],g_corners_timestamp[0][1]),(0,0,255),15)
+
+        cv2.imshow("img", clone)
+        key = cv2.waitKey(1) & 0xFF
+        # if the 'c' key is pressed, break from the loop
+        if key == ord("c") or g_polygon_num_timestamp > NUM_OF_TIMESTAMP_AREA_CORNERS + 1:
+            cv2.destroyAllWindows()
+            break
+
+    user_defined_corners = {}
+    user_defined_corners["corners"] = g_corners_timestamp
+    pickle.dump(user_defined_corners, open( "cache/timestamp_corners.p", "wb" ))
+
+    # minor correction for improved accuracy
+
+    # leveling two points's x
+    # g_corners_timestamp[1][1] = g_corners_timestamp[2][1]
+    # g_corners_timestamp[0][1] = g_corners_timestamp[3][1]
+
+    # leveling two points's y
+    # g_corners_timestamp[0][0] = g_corners_timestamp[1][0]
+    # g_corners_timestamp[2][0] = g_corners_timestamp[3][0]
+    print("User defined corners: ", g_corners_timestamp)
+
+    return g_corners_timestamp
 
 # class Link:
 #     def __init__(self, src, end):
@@ -219,14 +320,40 @@ def square_distance(p1, p2):
     return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**0.5
 
 def pipeline(frame):
-    global ct, history, DEFINE_NEW_ROI, CORNER_VALID, g_corners, ROI_MASK, MASK_VALID, GRID_MATRIX_INIT, grid_matrix, frame_seq
+    global ct, history, CORNER_VALID, g_corners, TIMESTAMP_AREA_CORNER_VALID, g_corners_timestamp, ROI_MASK, MASK_VALID, GRID_MATRIX_INIT, grid_matrix, frame_seq
+    
+    # take care of ROI
     if CORNER_VALID == 0 and DEFINE_NEW_ROI:
         get_corners(frame)
         CORNER_VALID = 1
     elif CORNER_VALID == 0:
         g_corners = load_user_defined_corners()
         CORNER_VALID = 1
-    
+
+    # take care of Timestamp area
+    if TIMESTAMP_AREA_CORNER_VALID == 0 and DEFINE_NEW_TIMESTAMP_AREA:
+        get_timestamp_corners(frame)
+        TIMESTAMP_AREA_CORNER_VALID = 1
+    elif TIMESTAMP_AREA_CORNER_VALID == 0:
+        g_corners_timestamp = load_timestamp_corners()
+        TIMESTAMP_AREA_CORNER_VALID = 1
+
+    # assuming the 1st click of the g_corners_timestamp is the left top corner of the rectangular
+    y = g_corners_timestamp[0][1]
+    x = g_corners_timestamp[0][0]
+    width = g_corners_timestamp[1][0] - g_corners_timestamp[0][0]
+    height = g_corners_timestamp[3][1] - g_corners_timestamp[0][1]
+    timestamp_area = frame[y:y+height,x:x+width]
+    # cv2.imshow("cropped", timestamp_area)
+    # cv2.waitKey(0)
+
+    gray = cv2.cvtColor(timestamp_area, cv2.COLOR_BGR2GRAY)
+    #gray = cv2.threshold(gray, 0, 255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    #gray = cv2.medianBlur(gray, 3)
+
+    text = pytesseract.image_to_string(gray)
+    print(text)
+
     if MASK_VALID == 0:
         ROI_MASK = np.zeros_like(frame[:,:,0], dtype=np.uint8)
         np_corners = np.array(g_corners, dtype = np.int32)
