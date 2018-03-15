@@ -23,6 +23,9 @@ ct = Counter()
 history = deque(maxlen = 1)
 screen = [] # keep track of unique objects within the screen
 
+
+Clear_Frame_Index = 95
+
 # Timestamp area variables
 DEFINE_NEW_TIMESTAMP_AREA = 0
 NUM_OF_TIMESTAMP_AREA_CORNERS = 4
@@ -30,12 +33,23 @@ TIMESTAMP_AREA_CORNER_VALID = 0
 g_corners_timestamp = []
 g_polygon_num_timestamp = 0
 
+t_i_1_s = 0 # timestamp area index 1 start
+t_i_1_e = 0 # timestamp area index 1 end
+t_i_2_s = 0 # timestamp area index 2 start
+t_i_2_e = 0 # timestamp area index 2 end
+
 # ROI variables
 DEFINE_NEW_ROI = 0
 NUM_OF_CORNERS = 5
 CORNER_VALID = 0
 g_corners = []
 g_polygon_num = 0
+
+# User Clicks log
+GET_NEW_USER_CLICKS = 0
+CLICK_VALID = 0
+NUM_OF_CLICKS_TO_COLLECT = 4
+click_logs = []
 
 
 MASK_VALID = 0
@@ -70,11 +84,23 @@ Brief
 Input
     None
 Return
-    user_defined_corners corners
+    timestamp_corners corners
 '''
 def load_timestamp_corners():
     timestamp_corners = pickle.load(open("cache/timestamp_corners.p", "rb" ))
     return timestamp_corners["corners"]
+
+'''
+Brief
+    This function will load cached user clicks log
+Input
+    None
+Return
+    click_logs corners
+'''
+def load_click_logs():
+    click_logs = pickle.load(open("cache/click_logs.p", "rb" ))
+    return click_logs["corners"]
 
 '''
 Brief
@@ -166,6 +192,57 @@ def get_corners(img):
     print("User defined corners: ", g_corners)
 
     return g_corners
+
+'''
+Brief
+    This function will handle user clicks on a opened cv2 image
+Input
+    event: event handler
+    x: x coordinate
+    y: y coordinate
+    flags: flags (not in use)
+    param: param (not in use)
+Return
+    None
+'''
+def clicks(event, x, y, flags, param):
+    if event == cv2.EVENT_LBUTTONDOWN:
+        print([x,y])
+        click_logs.append([x,y])
+
+'''
+Brief
+    This function will log user clicks on a image for n times.
+Input
+    img: input image
+    n: num of clicks
+Return
+    A list of image coordinates. 
+'''
+def user_clicks(img, n):
+
+    # clone the image, and setup the mouse callback function
+    clone = img.copy()
+
+    cv2.namedWindow("img")
+    cv2.setMouseCallback("img", clicks)
+
+    # keep looping until the 'c' key  is pressed or more than 4 corners are defined
+    while True:
+        cv2.imshow("img", clone)
+        key = cv2.waitKey(1) & 0xFF
+        # if the 'c' key is pressed, break from the loop
+        if key == ord("c") or len(click_logs) > (n-1):
+            cv2.destroyAllWindows()
+            break
+
+    user_defined_corners = {}
+    user_defined_corners["corners"] = click_logs
+    pickle.dump(user_defined_corners, open( "cache/click_logs.p", "wb" ))
+
+    print("User clicks: ", click_logs)
+
+    return click_logs
 
 '''
 Brief
@@ -320,30 +397,9 @@ def square_distance(p1, p2):
     return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**0.5
 
 def pipeline(frame):
-    global ct, history, CORNER_VALID, g_corners, TIMESTAMP_AREA_CORNER_VALID, g_corners_timestamp, ROI_MASK, MASK_VALID, GRID_MATRIX_INIT, grid_matrix, frame_seq
-    
-    # take care of ROI
-    if CORNER_VALID == 0 and DEFINE_NEW_ROI:
-        get_corners(frame)
-        CORNER_VALID = 1
-    elif CORNER_VALID == 0:
-        g_corners = load_user_defined_corners()
-        CORNER_VALID = 1
+    global ct, history, ROI_MASK, MASK_VALID, GRID_MATRIX_INIT, grid_matrix, frame_seq
 
-    # take care of Timestamp area
-    if TIMESTAMP_AREA_CORNER_VALID == 0 and DEFINE_NEW_TIMESTAMP_AREA:
-        get_timestamp_corners(frame)
-        TIMESTAMP_AREA_CORNER_VALID = 1
-    elif TIMESTAMP_AREA_CORNER_VALID == 0:
-        g_corners_timestamp = load_timestamp_corners()
-        TIMESTAMP_AREA_CORNER_VALID = 1
-
-    # assuming the 1st click of the g_corners_timestamp is the left top corner of the rectangular
-    y = g_corners_timestamp[0][1]
-    x = g_corners_timestamp[0][0]
-    width = g_corners_timestamp[1][0] - g_corners_timestamp[0][0]
-    height = g_corners_timestamp[3][1] - g_corners_timestamp[0][1]
-    timestamp_area = frame[y:y+height,x:x+width]
+    timestamp_area = frame[t_i_1_s:t_i_1_e,t_i_2_s:t_i_2_e]
     # cv2.imshow("cropped", timestamp_area)
     # cv2.waitKey(0)
 
@@ -405,6 +461,45 @@ def pipeline(frame):
 
     return fm.box_img
 
+def Collect_User_Input(frame):
+    global CLICK_VALID, CORNER_VALID, g_corners, TIMESTAMP_AREA_CORNER_VALID, g_corners_timestamp, t_i_1_s, t_i_1_e, t_i_2_s, t_i_2_e
+    # take care of user clicks
+    if CLICK_VALID == 0 and GET_NEW_USER_CLICKS:
+        user_clicks(frame,NUM_OF_CLICKS_TO_COLLECT)
+        CLICK_VALID = 1
+    elif CORNER_VALID == 0:
+        g_corners = load_click_logs()
+        CLICK_VALID = 1
+
+    
+    # take care of ROI
+    if CORNER_VALID == 0 and DEFINE_NEW_ROI:
+        get_corners(frame)
+        CORNER_VALID = 1
+    elif CORNER_VALID == 0:
+        g_corners = load_user_defined_corners()
+        CORNER_VALID = 1
+
+    # take care of Timestamp area
+    if TIMESTAMP_AREA_CORNER_VALID == 0 and DEFINE_NEW_TIMESTAMP_AREA:
+        get_timestamp_corners(frame)
+        TIMESTAMP_AREA_CORNER_VALID = 1
+    elif TIMESTAMP_AREA_CORNER_VALID == 0:
+        g_corners_timestamp = load_timestamp_corners()
+        TIMESTAMP_AREA_CORNER_VALID = 1
+
+    # assuming the 1st click of the g_corners_timestamp is the left top corner of the rectangular
+    y = g_corners_timestamp[0][1]
+    x = g_corners_timestamp[0][0]
+    width = g_corners_timestamp[1][0] - g_corners_timestamp[0][0]
+    height = g_corners_timestamp[3][1] - g_corners_timestamp[0][1]
+    t_i_1_s = y # timestamp area index 1 start
+    t_i_1_e = y+height # timestamp area index 1 end
+    t_i_2_s = x # timestamp area index 2 start
+    t_i_2_e = y+width # timestamp area index 2 end
+    
+    #timestamp_area = frame[y:y+height,x:x+width]
+
 if __name__ == "__main__":
     # os.chdir("/home/sirius/Desktop/darknet/")
     net = load_net(b"darknet/cfg/yolo.cfg", b"weights/yolo.weights", 0)
@@ -442,6 +537,10 @@ if __name__ == "__main__":
 
     output = 'ch01.mp4'
     clip_i = VideoFileClip("cut_ch01.mp4")
+
+    HCI_frame = clip_i.get_frame(Clear_Frame_Index*1.0/clip_i.fps)
+    Collect_User_Input(HCI_frame)
+
     clip = clip_i.fl_image(pipeline)
     clip.write_videofile(output, audio=False)
 
